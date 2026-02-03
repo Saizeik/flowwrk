@@ -1,0 +1,44 @@
+name: Refresh Open Jobs Feed
+
+on:
+  schedule:
+    - cron: "0 */6 * * *" # every 6 hours (UTC)
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Supabase Edge Function
+        env:
+          FUNCTION_URL: ${{ secrets.SUPABASE_FUNCTION_URL }}
+          SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          echo "FUNCTION_URL starts with: ${FUNCTION_URL:0:8}"
+          if [[ "$FUNCTION_URL" != https://* ]]; then
+            echo "❌ FUNCTION_URL is not an https URL. Check SUPABASE_FUNCTION_URL secret."
+            exit 1
+          fi
+
+          # Defensive trim (removes hidden newline/spaces if present)
+          FUNCTION_URL="$(echo -n "$FUNCTION_URL" | tr -d '\r\n' | xargs)"
+
+          echo "Calling Edge Function..."
+          BODY='{
+            "job_titles": ["Software Engineer", "Frontend Engineer", "Customer Support", "Data Analyst"],
+            "location": "United States",
+            "max_results_per_title": 25
+          }'
+
+          curl -f -sS -X POST "$FUNCTION_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $SERVICE_ROLE" \
+            -H "apikey: $ANON_KEY" \
+            --data "$BODY" \
+            | tee response.json
+
+          echo ""
+          echo "✅ Response written to response.json"
