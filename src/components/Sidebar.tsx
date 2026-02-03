@@ -5,7 +5,7 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col">
-      <div className="p-4 font-semibold">JobJourney</div>
+      <div className="p-4 font-semibold">flowwrk</div>
 
       <nav className="flex-1 px-2">{/* nav items */}</nav>
 

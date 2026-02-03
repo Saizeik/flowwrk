@@ -180,7 +180,7 @@ export default function Home() {
 
         {/* Footer */}
         <div className="mt-14 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 sm:flex-row">
-          <div className="text-sm text-white/70">© {new Date().getFullYear()} JobTrack</div>
+          <div className="text-sm text-white/70">© {new Date().getFullYear()} Flowwrk</div>
           <div className="flex items-center gap-4 text-sm">
             <Link className="text-white/80 hover:text-white" to="/login">
               Sign in

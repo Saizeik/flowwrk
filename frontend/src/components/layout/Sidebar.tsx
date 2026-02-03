@@ -86,7 +86,7 @@ export default function Sidebar() {
           <Briefcase className="h-5 w-5" />
         </div>
         <div className="leading-tight">
-          <div className="text-sm font-semibold text-slate-900">JobTrack</div>
+          <div className="text-sm font-semibold text-slate-900">Flowwrk</div>
           <div className="text-xs text-slate-500">Pro</div>
         </div>
       </div>
