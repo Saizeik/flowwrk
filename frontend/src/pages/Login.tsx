@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Github, Chrome, ArrowRight, Mail, Lock } from "lucide-react";
+import { Github, Chrome, Linkedin, ArrowRight, Mail, Lock } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import BrandLogo from "../components/BrandLogo";
 
@@ -27,7 +27,7 @@ export default function Login() {
     navigate("/dashboard");
   };
 
-  const oauth = async (provider: "google" | "github") => {
+  const oauth = async (provider: "google" | "github"| "linkedin_oidc") => {
     setError(null);
     setLoading(true);
 
@@ -76,6 +76,13 @@ export default function Login() {
               <Github className="h-4 w-4 text-slate-700" />
               Continue with GitHub
             </button>
+
+            <button onClick={() => oauth("linkedin_oidc")}
+             className="w-full inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+             disabled={loading}>
+                 <Linkedin className="h-4 w-4 text-slate-700" />
+             Continue with LinkedIn
+</button>
           </div>
 
           <div className="my-6 flex items-center gap-3">

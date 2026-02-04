@@ -16,6 +16,7 @@ import Board from "../pages/Board";
 import Analytics from "../pages/Analytics";
 import Settings from "../pages/Settings";
 import OpenJobs from "../pages/OpenJobs";
+import AuthCallback from "../pages/AuthCallback";
 
 export default function AppRoutes() {
   return (
@@ -25,6 +26,8 @@ export default function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+          {/* ✅ OAuth landing route (must be public) */}
+  <Route path="/auth/callback" element={<AuthCallback />} />
       </Route>
 
       {/* PROTECTED */}
