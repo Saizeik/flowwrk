@@ -29,7 +29,7 @@ export default function Login() {
     navigate("/dashboard");
   };
 
-  const oauth = async (provider: "google" | "github") => {
+  const oauth = async (provider: "google" | "github"|"linkedin_oidc") => {
     setError(null);
     setLoading(true);
 

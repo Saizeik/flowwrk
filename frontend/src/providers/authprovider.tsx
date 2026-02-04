@@ -9,7 +9,7 @@ type AuthContextValue = {
 
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
-  signInWithProvider: (provider: "google" | "github") => Promise<void>;
+  signInWithProvider: (provider: "google" | "github"|"linkedin_oidc") => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async signInWithProvider(provider) {
         const redirectTo =
           import.meta.env.DEV
-            ? "http://localhost:3000/dashboard"
+            ? "http:/flowwrk.vercel.app/dashboard"
             : `${window.location.origin}/dashboard`;
 
         const { error } = await supabase.auth.signInWithOAuth({
