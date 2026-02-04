@@ -161,6 +161,16 @@ export default function ContactsTab({ applicationId }: Props) {
     setEditDraft(toDraft(c));
   };
 
+  const cancelCreate = () => {
+    setCreating(false);
+    setDraft(emptyDraft);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDraft(emptyDraft);
+  };
+
   if (contactsQuery.isLoading) {
     return <div className="text-sm text-slate-600">Loading contacts…</div>;
   }
@@ -175,8 +185,8 @@ export default function ContactsTab({ applicationId }: Props) {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header (mobile-first) */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-slate-900">Contacts</div>
           <div className="mt-1 text-sm text-slate-500">
@@ -189,7 +199,7 @@ export default function ContactsTab({ applicationId }: Props) {
             type="button"
             onClick={() => setCreating(true)}
             disabled={!canWrite}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 sm:w-auto"
           >
             <Plus className="h-4 w-4" />
             Add contact
@@ -237,14 +247,11 @@ export default function ContactsTab({ applicationId }: Props) {
             />
           </div>
 
-          <div className="mt-4 flex items-center justify-end gap-2">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
-              onClick={() => {
-                setCreating(false);
-                setDraft(emptyDraft);
-              }}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              onClick={cancelCreate}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
             >
               <X className="h-4 w-4" />
               Cancel
@@ -254,7 +261,7 @@ export default function ContactsTab({ applicationId }: Props) {
               type="button"
               onClick={() => createMut.mutate()}
               disabled={createMut.isPending || !canWrite}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 sm:w-auto"
             >
               <Save className="h-4 w-4" />
               {createMut.isPending ? "Saving…" : "Save"}
@@ -281,7 +288,7 @@ export default function ContactsTab({ applicationId }: Props) {
 
             return (
               <div key={c.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     {!isEditing ? (
                       <>
@@ -292,7 +299,7 @@ export default function ContactsTab({ applicationId }: Props) {
                           {c.title || "—"}
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 text-sm text-slate-600">
                           {c.email ? (
                             <a
                               className="inline-flex items-center gap-2 hover:underline"
@@ -354,13 +361,13 @@ export default function ContactsTab({ applicationId }: Props) {
                     )}
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
                     {!isEditing ? (
                       <>
                         <button
                           type="button"
                           onClick={() => startEdit(c)}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
                         >
                           Edit
                         </button>
@@ -368,7 +375,7 @@ export default function ContactsTab({ applicationId }: Props) {
                           type="button"
                           onClick={() => deleteMut.mutate(c.id)}
                           disabled={deleteMut.isPending}
-                          className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-50 sm:w-auto"
                         >
                           <Trash2 className="h-4 w-4" />
                           Delete
@@ -378,11 +385,8 @@ export default function ContactsTab({ applicationId }: Props) {
                       <>
                         <button
                           type="button"
-                          onClick={() => {
-                            setEditingId(null);
-                            setEditDraft(emptyDraft);
-                          }}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          onClick={cancelEdit}
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
                         >
                           <X className="h-4 w-4" />
                           Cancel
@@ -391,7 +395,7 @@ export default function ContactsTab({ applicationId }: Props) {
                           type="button"
                           onClick={() => updateMut.mutate({ id: c.id, draft: editDraft })}
                           disabled={updateMut.isPending}
-                          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 sm:w-auto"
                         >
                           <Save className="h-4 w-4" />
                           {updateMut.isPending ? "Saving…" : "Save"}

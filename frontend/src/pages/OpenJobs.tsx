@@ -1,13 +1,25 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Search, MapPin, RefreshCw } from "lucide-react";
+import { Search, MapPin, RefreshCw, ExternalLink } from "lucide-react";
 import { jobsApi, type OpenJob } from "../api";
 
 type JobsResponse = {
   data: OpenJob[];
   meta?: { total?: number };
 };
+
+// Twitch purple palette (no Tailwind config required)
+const TWITCH_PURPLE = "#9146FF";
+const TWITCH_PURPLE_HOVER = "#772CE8";
+
+// Complementary “indigo” for Apply
+const APPLY_INDIGO = "#4F46E5"; // close to indigo-600
+const APPLY_INDIGO_HOVER = "#4338CA"; // close to indigo-700
+
+const btnBase =
+  "inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-medium shadow-sm " +
+  "focus-visible:outline-none focus-visible:ring-2 active:scale-[0.98] transition";
 
 export default function OpenJobs() {
   const navigate = useNavigate();
@@ -24,30 +36,24 @@ export default function OpenJobs() {
 
   const queryKey = ["open-jobs", page, pageSize, appliedQ, appliedLocation];
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    isError,
-    error,
-    refetch,
-  } = useQuery<JobsResponse>({
-    queryKey,
-    queryFn: async () => {
-      const res = await jobsApi.getOpenInternships(page, pageSize, {
-        q: appliedQ,
-        location: appliedLocation,
-      });
+  const { data, isLoading, isFetching, isError, error, refetch } =
+    useQuery<JobsResponse>({
+      queryKey,
+      queryFn: async () => {
+        const res = await jobsApi.getOpenInternships(page, pageSize, {
+          q: appliedQ,
+          location: appliedLocation,
+        });
 
-      // The API returns { data: OpenJob[], meta: { total } }
-      const jobs = res.data;
+        // The API returns { data: OpenJob[], meta: { total } }
+        const jobs = res.data;
 
-      return {
-        data: jobs,
-        meta: res.meta,
-      };
-    },
-  });
+        return {
+          data: jobs,
+          meta: res.meta,
+        };
+      },
+    });
 
   const openJobs = data?.data ?? [];
   const total = data?.meta?.total;
@@ -81,14 +87,26 @@ export default function OpenJobs() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Open Jobs</h1>
           <p className="mt-1 text-sm text-slate-600">
-            Shared job feed (from your server refresh). Use search + location to filter.
+            Shared job feed (from your server refresh). Use search + location to
+            filter.
           </p>
         </div>
 
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-60"
+          className={btnBase + " text-white"}
+          style={{
+            background: APPLY_INDIGO,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background =
+              APPLY_INDIGO_HOVER;
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background =
+              APPLY_INDIGO;
+          }}
         >
           <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
           {isFetching ? "Refreshing..." : "Refresh"}
@@ -124,17 +142,27 @@ export default function OpenJobs() {
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-2 md:justify-end">
+          <div className="flex flex-col gap-2 md:flex-row md:justify-end">
             <button
               type="button"
               onClick={onClearFilters}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              className={btnBase + " border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}
             >
               Clear
             </button>
+
             <button
               type="submit"
-              className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+              className={btnBase + " text-white"}
+              style={{ background: "#0F172A" }} // slate-900
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background =
+                  "#1E293B"; // slate-800
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background =
+                  "#0F172A";
+              }}
             >
               Apply
             </button>
@@ -203,20 +231,42 @@ export default function OpenJobs() {
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-2">
+                  {/* Buttons (mobile-friendly) */}
+                  <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                    {/* Add to Applications (Twitch purple) */}
                     <button
                       onClick={() => handleAddApplication(job)}
-                      className="rounded-xl bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+                      className={btnBase + " w-full text-white sm:w-auto"}
+                      style={{ background: TWITCH_PURPLE }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background =
+                          TWITCH_PURPLE_HOVER;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.background =
+                          TWITCH_PURPLE;
+                      }}
                     >
                       Add to my Applications
                     </button>
 
+                    {/* Apply (complementary indigo) */}
                     <a
                       href={job.jobUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-xl bg-blue-600 px-3.5 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+                      className={btnBase + " w-full text-white sm:w-auto"}
+                      style={{ background: APPLY_INDIGO }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLAnchorElement).style.background =
+                          APPLY_INDIGO_HOVER;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLAnchorElement).style.background =
+                          APPLY_INDIGO;
+                      }}
                     >
+                      <ExternalLink className="h-4 w-4" />
                       Apply
                     </a>
                   </div>
@@ -232,8 +282,8 @@ export default function OpenJobs() {
         <div className="text-sm text-slate-500">
           {typeof total === "number" ? (
             <>
-              Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)}{" "}
-              of {total} jobs
+              Showing {page * pageSize + 1}–
+              {Math.min((page + 1) * pageSize, total)} of {total} jobs
             </>
           ) : (
             <>Page {page + 1}</>
@@ -257,7 +307,8 @@ export default function OpenJobs() {
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={
-              isFetching || (totalPages ? page + 1 >= totalPages : openJobs.length < pageSize)
+              isFetching ||
+              (totalPages ? page + 1 >= totalPages : openJobs.length < pageSize)
             }
             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
           >

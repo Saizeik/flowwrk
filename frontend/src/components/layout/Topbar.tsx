@@ -1,12 +1,16 @@
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Plus, Upload, Search, LogOut } from "lucide-react";
+import { Bell, Plus, Upload, Search, LogOut, Menu } from "lucide-react";
 import { useAuth } from "../../providers/authprovider";
 import NotificationsPopover from "../layout/NotificationsPopover";
 import { useQuery } from "@tanstack/react-query";
 import { remindersApi } from "../../api";
 
-export default function Topbar() {
+type TopbarProps = {
+  onOpenSidebar?: () => void;
+};
+
+export default function Topbar({ onOpenSidebar }: TopbarProps) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -22,21 +26,40 @@ export default function Topbar() {
     navigate("/login");
   };
 
-  // Optional: small “dot” indicator without opening popover
+  // Small notification dot logic
   const days = 14;
   const dotQuery = useQuery({
     queryKey: ["reminders_upcoming", days],
-    queryFn: () => remindersApi.getUpcoming({ days, includeOverdue: true, limit: 1 }),
+    queryFn: () =>
+      remindersApi.getUpcoming({
+        days,
+        includeOverdue: true,
+        limit: 1,
+      }),
     enabled: !!user?.id,
     staleTime: 60_000,
   });
 
-  const hasUpcoming = useMemo(() => (dotQuery.data?.data?.length ?? 0) > 0, [dotQuery.data]);
+  const hasUpcoming = useMemo(
+    () => (dotQuery.data?.data?.length ?? 0) > 0,
+    [dotQuery.data]
+  );
 
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/80 backdrop-blur">
-      <div className="flex h-16 items-center gap-4 px-6">
-        <div className="relative w-full max-w-xl">
+    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
+      <div className="flex h-16 items-center gap-3 px-4 sm:gap-4 sm:px-6">
+        {/* ✅ Mobile hamburger */}
+        <button
+          type="button"
+          onClick={() => onOpenSidebar?.()}
+          className="lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+          aria-label="Open sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        {/* Search */}
+        <div className="relative min-w-0 flex-1 sm:max-w-xl">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -45,23 +68,24 @@ export default function Topbar() {
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Actions */}
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <Link
             to="/applications"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 sm:px-3.5"
             title="Import CSV"
           >
             <Upload className="h-4 w-4" />
-            Import CSV
+            <span className="hidden sm:inline">Import CSV</span>
           </Link>
 
           <Link
             to="/applications/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            className="inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-3 text-sm font-medium text-white shadow-sm hover:bg-blue-700 sm:px-4"
             title="Add New Job"
           >
             <Plus className="h-4 w-4" />
-            New Application
+            <span className="hidden sm:inline">New Application</span>
           </Link>
 
           {/* Notifications */}
@@ -74,14 +98,19 @@ export default function Topbar() {
               aria-expanded={open}
             >
               <Bell className="h-4 w-4" />
-              {hasUpcoming ? (
+              {hasUpcoming && (
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500" />
-              ) : null}
+              )}
             </button>
 
-            <NotificationsPopover open={open} onClose={() => setOpen(false)} days={14} />
+            <NotificationsPopover
+              open={open}
+              onClose={() => setOpen(false)}
+              days={14}
+            />
           </div>
 
+          {/* Desktop account + logout */}
           <div className="hidden items-center gap-2 sm:flex">
             <Link
               to="/settings"
@@ -89,9 +118,10 @@ export default function Topbar() {
             >
               {displayName}
             </Link>
+
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+              className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
               title="Logout"
             >
               <LogOut className="h-4 w-4" />

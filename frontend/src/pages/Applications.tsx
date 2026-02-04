@@ -1,324 +1,343 @@
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Filter,
-  Plus,
-  Search,
-  Trash2,
-  Upload,
-} from "lucide-react";
-
+// src/pages/Applications.tsx
+import React, { useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search, Filter, Sparkles, Plus, Archive } from "lucide-react";
 import { applicationsApi, type Application } from "../api";
-import ApplicationCard from "../components/ApplicationCard";
-import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
+import StatusBadge from "../components/StatusBadge";
+import PriorityBadge from "../components/PriorityBadge";
+import AddApplicationModal from "../components/AddApplicationModal";
 import { useAuth } from "../providers/authprovider";
 
-const ITEMS_PER_PAGE = 12;
+function cx(...parts: Array<string | false | undefined | null>) {
+  return parts.filter(Boolean).join(" ");
+}
+
+const STATUS_OPTIONS: Array<{ value: Application["status"] | "ALL"; label: string }> = [
+  { value: "ALL", label: "All statuses" },
+  { value: "SAVED", label: "Saved" },
+  { value: "APPLIED", label: "Applied" },
+  { value: "OA", label: "Online Assessment" },
+  { value: "INTERVIEW", label: "Interview" },
+  { value: "OFFER", label: "Offer" },
+  { value: "REJECTED", label: "Rejected" },
+];
 
 export default function Applications() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const qc = useQueryClient();
+  const { profile } = useAuth();
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
-  const [currentPage, setCurrentPage] = useState(1);
+  const showArchivedApps = Boolean(profile?.showArchivedApps);
 
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [applicationToDelete, setApplicationToDelete] =
-    useState<Application | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState<Application["status"] | "ALL">("ALL");
+  const [dateRange, setDateRange] = useState<"all" | "7" | "30" | "90">("all");
 
-  /**
-   * IMPORTANT:
-   * Use the same queryKey used elsewhere (NewApplication invalidates ["apps"])
-   */
-  const { data: applications = [], isLoading, error } = useQuery<Application[]>({
-    queryKey: ["apps"],
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["applications", "list"],
     queryFn: async () => {
       const res = await applicationsApi.getAll({ page: 0, size: 2000 });
-      return res.data.content; // ✅ correct shape
+      return res.data.content as Application[];
     },
+    staleTime: 30_000,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await applicationsApi.delete(id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["apps"] });
-    },
-  });
+  const apps = data ?? [];
 
-  const filteredApplications = useMemo(() => {
-    let filtered: Application[] = Array.isArray(applications) ? applications : [];
+  const filtered = useMemo(() => {
+    let arr = [...apps];
 
-    // Hide archived unless user wants them
-    if (!user?.showArchivedApps) {
-      filtered = filtered.filter((app) => !app.archived);
+    if (!showArchivedApps) {
+      arr = arr.filter((a) => !a.archived);
     }
 
-    // Search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (app) =>
-          app.company?.toLowerCase().includes(q) ||
-          app.role?.toLowerCase().includes(q) ||
-          app.location?.toLowerCase().includes(q)
-      );
+    if (status !== "ALL") {
+      arr = arr.filter((a) => a.status === status);
     }
 
-    // Status
-    if (statusFilter !== "ALL") {
-      filtered = filtered.filter((app) => app.status === statusFilter);
+    if (q.trim()) {
+      const s = q.toLowerCase();
+      arr = arr.filter((a) => {
+        return (
+          a.company?.toLowerCase().includes(s) ||
+          a.role?.toLowerCase().includes(s) ||
+          a.location?.toLowerCase().includes(s)
+        );
+      });
     }
 
-    // Priority
-    if (priorityFilter !== "ALL") {
-      filtered = filtered.filter((app) => app.priority === priorityFilter);
+    if (dateRange !== "all") {
+      const days = Number(dateRange);
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      arr = arr.filter((a) => {
+        const d = new Date(a.updatedAt ?? a.createdAt);
+        return !Number.isNaN(d.getTime()) && d >= cutoff;
+      });
     }
 
-    return filtered;
-  }, [applications, user?.showArchivedApps, searchQuery, statusFilter, priorityFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredApplications.length / ITEMS_PER_PAGE));
-
-  // If filters reduce pages and current page becomes invalid, snap back
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages);
-  }, [currentPage, totalPages]);
-
-  const paginatedApplications = filteredApplications.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  const handleDelete = (id: string, e: MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    const app = applications.find((a) => a.id === id);
-    if (!app) return;
-
-    setApplicationToDelete(app);
-    setDeleteModalOpen(true);
-  };
-
-  const confirmDelete = () => {
-    if (!applicationToDelete) return;
-
-    deleteMutation.mutate(applicationToDelete.id, {
-      onSuccess: () => {
-        setDeleteModalOpen(false);
-        setApplicationToDelete(null);
-      },
+    // newest first (updatedAt fallback createdAt)
+    arr.sort((a, b) => {
+      const da = new Date(a.updatedAt ?? a.createdAt).getTime();
+      const db = new Date(b.updatedAt ?? b.createdAt).getTime();
+      return db - da;
     });
-  };
 
-  const handlePageChange = (page: number) => {
-    const next = Math.min(Math.max(1, page), totalPages);
-    setCurrentPage(next);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+    return arr;
+  }, [apps, showArchivedApps, status, q, dateRange]);
 
-  if (isLoading) {
-    return <div className="text-sm text-slate-600">Loading...</div>;
-  }
+  const totals = useMemo(() => {
+    const open = apps.filter((a) => !a.archived);
+    const by = (s: Application["status"]) => open.filter((a) => a.status === s).length;
 
-  if (error) {
-    return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-        Failed to load applications.
-      </div>
-    );
-  }
+    return {
+      totalOpen: open.length,
+      saved: by("SAVED"),
+      applied: by("APPLIED"),
+      interview: by("INTERVIEW") + by("OA"),
+      offer: by("OFFER"),
+      archived: apps.filter((a) => a.archived).length,
+    };
+  }, [apps]);
 
   return (
-    <>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => navigate("/applications/import")}
-              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
-            >
-              <Upload className="h-4 w-4" />
-              Import CSV
-            </button>
-
-            <button
-              onClick={() => navigate("/applications/new")}
-              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
-            >
-              <Plus className="h-4 w-4" />
-              New Application
-            </button>
-          </div>
+    <div className="space-y-6">
+      {/* backdrop glow */}
+      <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute left-0 top-0 h-52 w-52 rounded-full bg-blue-500/10 blur-3xl" />
+          <div className="absolute right-0 top-6 h-52 w-52 rounded-full bg-violet-500/10 blur-3xl" />
+          <div className="absolute left-24 bottom-0 h-52 w-52 rounded-full bg-emerald-500/10 blur-3xl" />
         </div>
 
-        {/* Filters */}
-        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by company, role, or location..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            {/* Status */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full appearance-none rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="SAVED">Saved</option>
-                <option value="APPLIED">Applied</option>
-                <option value="OA">Online Assessment</option>
-                <option value="INTERVIEW">Interview</option>
-                <option value="OFFER">Offer</option>
-                <option value="REJECTED">Rejected</option>
-              </select>
-            </div>
-
-            {/* Priority */}
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <select
-                value={priorityFilter}
-                onChange={(e) => {
-                  setPriorityFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full appearance-none rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              >
-                <option value="ALL">All Priorities</option>
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-              </select>
-            </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Applications
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Search, filter, and keep your pipeline moving.
+            </p>
           </div>
 
-          <div className="mt-3 text-sm text-gray-600">
-            Showing {paginatedApplications.length} of {filteredApplications.length} applications
-          </div>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" />
+            Add Application
+          </button>
         </div>
-
-        {/* Grid */}
-        {paginatedApplications.length === 0 ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-12 text-center shadow-sm">
-            <p className="text-gray-500">No applications found</p>
-
-            {(searchQuery || statusFilter !== "ALL" || priorityFilter !== "ALL") && (
-              <button
-                onClick={() => {
-                  setSearchQuery("");
-                  setStatusFilter("ALL");
-                  setPriorityFilter("ALL");
-                  setCurrentPage(1);
-                }}
-                className="mt-4 cursor-pointer text-indigo-600 hover:underline"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {paginatedApplications.map((application) => (
-                <div key={application.id} className="relative group">
-                  <ApplicationCard
-                    application={application}
-                    onClick={() => navigate(`/applications/${application.id}`)}
-                  />
-
-                  <button
-                    onClick={(e) => handleDelete(application.id, e)}
-                    className="absolute right-2 top-2 rounded-lg bg-white p-2 text-red-600 shadow-md opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-50"
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center gap-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="rounded-lg border border-gray-300 p-2 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-
-                <div className="flex gap-2">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => handlePageChange(page)}
-                      className={`rounded-lg px-4 py-2 ${
-                        currentPage === page
-                          ? "bg-indigo-600 text-white"
-                          : "border border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="rounded-lg border border-gray-300 p-2 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
-          </>
-        )}
       </div>
 
-      <ConfirmDeleteModal
-        isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false);
-          setApplicationToDelete(null);
+      {/* stats chips */}
+      <div className="flex flex-wrap gap-2">
+        <Chip label="Open" value={totals.totalOpen} tone="blue" />
+        <Chip label="Saved" value={totals.saved} tone="slate" />
+        <Chip label="Applied" value={totals.applied} tone="violet" />
+        <Chip label="Interview" value={totals.interview} tone="amber" />
+        <Chip label="Offers" value={totals.offer} tone="emerald" />
+        <Chip label="Archived" value={totals.archived} tone="rose" icon={<Archive className="h-3.5 w-3.5" />} />
+      </div>
+
+      {/* filters */}
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm backdrop-blur">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="relative md:col-span-2">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search role, company, location…"
+              className={cx(
+                "w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm",
+                "placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600/20"
+              )}
+            />
+          </div>
+
+          <div className="relative">
+            <Filter className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              className={cx(
+                "w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-900 shadow-sm",
+                "outline-none focus:ring-2 focus:ring-blue-600/20"
+              )}
+            >
+              {STATUS_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <select
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value as any)}
+              className={cx(
+                "w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-sm outline-none",
+                "focus:ring-2 focus:ring-blue-600/20"
+              )}
+            >
+              <option value="all">All time</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+
+            <div className="hidden md:flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+              <span className="mr-2 text-sm font-medium text-slate-700">Results</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">
+                <Sparkles className="h-3.5 w-3.5" />
+                {filtered.length}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* list */}
+      {isLoading ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-b-2 border-blue-600" />
+          <p className="mt-3 text-sm text-slate-600">Loading applications…</p>
+        </div>
+      ) : isError ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          Failed to load applications.
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+          <p className="text-slate-700">No applications found.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            Try clearing filters or add your first one.
+          </p>
+          <button
+            onClick={() => setAddOpen(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-slate-800"
+          >
+            <Plus className="h-4 w-4" />
+            Add Application
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((app) => (
+            <button
+              key={app.id}
+              type="button"
+              onClick={() => navigate(`/applications/${app.id}`)}
+              className={cx(
+                "group w-full rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition",
+                "hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600/20"
+              )}
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white">
+                      {(app.company?.trim()?.[0] ?? "?").toUpperCase()}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-slate-900">
+                        {app.role}
+                      </div>
+                      <div className="mt-0.5 truncate text-sm text-slate-600">
+                        {app.company}
+                      </div>
+                      {app.location ? (
+                        <div className="mt-1 truncate text-xs text-slate-500">
+                          {app.location}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {app.archived ? (
+                    <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+                      <Archive className="h-3.5 w-3.5" />
+                      Archived
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                  <StatusBadge status={app.status} />
+                  <PriorityBadge priority={app.priority} />
+                  <span className="text-xs text-slate-400">
+                    Updated {new Date(app.updatedAt ?? app.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 h-px w-full bg-slate-100" />
+
+              <div className="mt-3 flex items-center justify-between">
+                <Link
+                  to={`/applications/${app.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm font-medium text-blue-700 hover:text-blue-800"
+                >
+                  Open details →
+                </Link>
+
+                <span className="text-xs text-slate-400 group-hover:text-slate-500">
+                  Tap to open
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <AddApplicationModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onCreated={() => {
+          qc.invalidateQueries({ queryKey: ["applications", "list"] });
+          qc.invalidateQueries({ queryKey: ["apps"] });
         }}
-        onConfirm={confirmDelete}
-        loading={deleteMutation.isPending}
-        title="Delete Application"
-        message={
-          applicationToDelete
-            ? `Are you sure you want to delete your application to ${applicationToDelete.company} for ${applicationToDelete.role}? This action cannot be undone.`
-            : ""
-        }
       />
-    </>
+    </div>
+  );
+}
+
+function Chip({
+  label,
+  value,
+  tone,
+  icon,
+}: {
+  label: string;
+  value: number;
+  tone: "slate" | "blue" | "violet" | "amber" | "emerald" | "rose";
+  icon?: React.ReactNode;
+}) {
+  const cls =
+    tone === "blue"
+      ? "bg-blue-50 text-blue-700 ring-blue-200/60"
+      : tone === "violet"
+      ? "bg-violet-50 text-violet-700 ring-violet-200/60"
+      : tone === "amber"
+      ? "bg-amber-50 text-amber-700 ring-amber-200/60"
+      : tone === "emerald"
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-200/60"
+      : tone === "rose"
+      ? "bg-rose-50 text-rose-700 ring-rose-200/60"
+      : "bg-slate-100 text-slate-700 ring-slate-200/80";
+
+  return (
+    <div className={cx("inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ring-1", cls)}>
+      {icon ? icon : null}
+      <span>{label}</span>
+      <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold">{value}</span>
+    </div>
   );
 }

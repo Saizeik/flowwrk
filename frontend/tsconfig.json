@@ -17,7 +17,7 @@
     "jsx": "react-jsx",
     "baseUrl": "./"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../src/pages/AuthCalback.tsx"],
   "exclude": ["supabase/functions"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -50,9 +50,10 @@ export default function ApplicationCard({ application, onClick, className = "" }
     <div
       onClick={onClick}
       className={[
-        "group relative rounded-xl border border-slate-200 bg-white p-4",
-        "shadow-sm transition-all duration-200 cursor-pointer",
-        "hover:-translate-y-0.5 hover:shadow-md hover:border-slate-300",
+        "group relative rounded-2xl border border-slate-200 bg-white p-4",
+        "shadow-sm ring-1 ring-slate-500/5 transition-all duration-200 cursor-pointer",
+        "hover:-translate-y-[1px] hover:shadow-md hover:border-slate-300",
+        "active:translate-y-0 active:scale-[0.99]",
         className,
       ].join(" ")}
     >
@@ -60,7 +61,7 @@ export default function ApplicationCard({ application, onClick, className = "" }
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 gap-3">
           {/* avatar */}
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white text-sm font-semibold">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white text-sm font-semibold shadow-sm">
             {companyInitial(application.company)}
           </div>
 
@@ -79,7 +80,7 @@ export default function ApplicationCard({ application, onClick, className = "" }
       {/* salary shimmer */}
       {salaryText && (
         <div className="mt-3">
-          <div className="relative overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
             <div
               className="
                 pointer-events-none absolute inset-0
@@ -116,7 +117,6 @@ export default function ApplicationCard({ application, onClick, className = "" }
         <StatusBadge status={application.status} />
       </div>
 
-      {/* keyframes (Tailwind JIT will keep this because it's in an arbitrary animation class) */}
       <style>{`
         @keyframes shimmer {
           0% { transform: translateX(-60%); }

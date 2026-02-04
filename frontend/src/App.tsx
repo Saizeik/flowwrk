@@ -1,4 +1,4 @@
-import React from "react";
+import {useEffect} from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./AuthContext";
 import Login from "./pages/Login";
@@ -23,6 +23,28 @@ import Features from "./pages/Features";
 import About from "./pages/About";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import { applyTheme, getThemeMode} from "./lib/theme";
+
+
+
+useEffect(() => {
+  applyTheme(getThemeMode());
+
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => {
+    if (getThemeMode() === "system") applyTheme("system");
+  };
+
+  if (typeof mq.addEventListener === "function") {
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }
+
+  // legacy Safari fallback without TS warnings
+  const mqLegacy = mq as any;
+  mqLegacy.addListener(onChange);
+  return () => mqLegacy.removeListener(onChange);
+}, []);
 
 export default function App() {
   return (

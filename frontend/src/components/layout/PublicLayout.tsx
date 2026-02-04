@@ -7,12 +7,17 @@ import { PUBLIC_IMAGES } from "../public/publicImages";
 export default function PublicLayout() {
   const location = useLocation();
 
-  // Optional: different rotate speeds per page
   const rotateSeconds =
-    location.pathname === "/" ? 14 : location.pathname === "/login" ? 10 : 12;
+    location.pathname === "/" ? 14 :
+    location.pathname === "/login" ? 10 :
+    12;
 
   return (
-    <PublicPageShell images={PUBLIC_IMAGES} rotateSeconds={rotateSeconds}>
+    <PublicPageShell
+      images={PUBLIC_IMAGES}
+      rotateSeconds={rotateSeconds}
+      tone="light"   // ✅ explicit
+    >
       <Outlet />
     </PublicPageShell>
   );

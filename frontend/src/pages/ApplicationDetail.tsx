@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -32,9 +32,9 @@ type Tab =
   | "contacts"
   | "reminders"
   | "attachments"
-  | "activity";
+  | "history";
 
-const STATUSES = [
+const STATUSES: Array<{ id: Application["status"]; label: string }> = [
   { id: "SAVED", label: "Saved" },
   { id: "APPLIED", label: "Applied" },
   { id: "OA", label: "Online Assessment" },
@@ -42,6 +42,10 @@ const STATUSES = [
   { id: "OFFER", label: "Offer" },
   { id: "REJECTED", label: "Rejected" },
 ];
+
+function cx(...parts: Array<string | false | undefined | null>) {
+  return parts.filter(Boolean).join(" ");
+}
 
 export default function ApplicationDetail() {
   const { id } = useParams<{ id: string }>();
@@ -56,43 +60,18 @@ export default function ApplicationDetail() {
   const [applicationToDelete, setApplicationToDelete] =
     useState<Application | null>(null);
 
-  const { data: application, isLoading } = useQuery<Application>({
+  const {
+    data: application,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<Application>({
     queryKey: ["application", id],
+    enabled: !!id,
     queryFn: async () => {
       const response = await applicationsApi.getById(id!);
       return response.data;
     },
-    enabled: !!id,
-  });
-
-  const { data: notes = [] } = useQuery({
-    queryKey: ["notes", id],
-    queryFn: async () => [],
-    enabled: activeTab === "notes" && !!id,
-  });
-
-  const { data: contacts = [] } = useQuery({
-    queryKey: ["contacts", id],
-    queryFn: async () => [],
-    enabled: activeTab === "contacts" && !!id,
-  });
-
-  const { data: reminders = [] } = useQuery({
-    queryKey: ["reminders", id],
-    queryFn: async () => [],
-    enabled: activeTab === "reminders" && !!id,
-  });
-
-  const { data: attachments = [] } = useQuery({
-    queryKey: ["attachments", id],
-    queryFn: async () => [],
-    enabled: activeTab === "attachments" && !!id,
-  });
-
-  const { data: activities = [] } = useQuery({
-    queryKey: ["activities", id],
-    queryFn: async () => [],
-    enabled: activeTab === "activity" && !!id,
   });
 
   const updateMutation = useMutation({
@@ -103,6 +82,7 @@ export default function ApplicationDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["application", id] });
       queryClient.invalidateQueries({ queryKey: ["applications"] });
+      queryClient.invalidateQueries({ queryKey: ["apps"] }); // board cache
       setIsEditing(false);
     },
   });
@@ -113,6 +93,7 @@ export default function ApplicationDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications"] });
+      queryClient.invalidateQueries({ queryKey: ["apps"] });
       navigate("/applications");
     },
   });
@@ -122,23 +103,24 @@ export default function ApplicationDetail() {
 
     setEditForm({
       ...application,
-      dateApplied: application.date_applied
-        ? format(new Date(application.date_applied), "yyyy-MM-dd")
+      // Application type uses dateApplied
+      dateApplied: application.dateApplied
+        ? format(new Date(application.dateApplied), "yyyy-MM-dd")
         : "",
     });
     setIsEditing(true);
   };
 
   const handleSave = () => {
-    const dataToSave: any = {
-      ...editForm,
-    };
+    const dataToSave: any = { ...editForm };
+
+    // Convert the edit field back to API model (dateApplied)
     if (dataToSave.dateApplied !== undefined) {
-      dataToSave.date_applied = dataToSave.dateApplied
+      dataToSave.dateApplied = dataToSave.dateApplied
         ? new Date(dataToSave.dateApplied).toISOString()
         : null;
-      delete dataToSave.dateApplied;
     }
+
     updateMutation.mutate(dataToSave);
   };
 
@@ -160,72 +142,79 @@ export default function ApplicationDetail() {
     });
   };
 
-  if (isLoading) return <div className="text-sm text-slate-600">Loading...</div>;
-  if (!application)
-    return <div className="text-sm text-slate-600">Application not found</div>;
+  const tabs = useMemo(
+    () => [
+      { id: "details" as Tab, label: "Details", icon: FileText },
+      { id: "notes" as Tab, label: "Notes", icon: FileText },
+      { id: "contacts" as Tab, label: "Contacts", icon: Users },
+      { id: "reminders" as Tab, label: "Reminders", icon: Bell },
+      { id: "attachments" as Tab, label: "Attachments", icon: Paperclip },
+      { id: "history" as Tab, label: "History", icon: Activity },
+    ],
+    []
+  );
 
-  const tabs = [
-    { id: "details" as Tab, label: "Details", icon: FileText },
-    { id: "notes" as Tab, label: "Notes", icon: FileText },
-    { id: "contacts" as Tab, label: "Contacts", icon: Users },
-    { id: "reminders" as Tab, label: "Reminders", icon: Bell },
-    { id: "attachments" as Tab, label: "Attachments", icon: Paperclip },
-    { id: "activity" as Tab, label: "Activity", icon: Activity },
-  ];
+  if (isLoading) return <div className="text-sm text-slate-600">Loading...</div>;
+
+  if (isError) {
+    return (
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+        Failed to load application: {String((error as any)?.message ?? error)}
+      </div>
+    );
+  }
+
+  if (!application) {
+    return <div className="text-sm text-slate-600">Application not found</div>;
+  }
 
   return (
     <>
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
               {isEditing ? (
                 <div className="space-y-4">
                   <input
                     type="text"
                     value={editForm.role ?? ""}
                     onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        role: e.target.value,
-                      })
+                      setEditForm((f: any) => ({ ...f, role: e.target.value }))
                     }
-                    className="text-2xl font-bold text-gray-900 border-b-2 border-indigo-500 focus:outline-none w-full"
+                    className="w-full border-b-2 border-indigo-500 text-2xl font-bold text-slate-900 focus:outline-none"
                   />
                   <input
                     type="text"
                     value={editForm.company ?? ""}
                     onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        company: e.target.value,
-                      })
+                      setEditForm((f: any) => ({ ...f, company: e.target.value }))
                     }
-                    className="text-lg text-gray-600 border-b border-gray-300 focus:outline-none w-full"
+                    className="w-full border-b border-slate-300 text-lg text-slate-600 focus:outline-none"
                   />
                 </div>
               ) : (
                 <>
-                  <h1 className="text-2xl font-bold text-gray-900">
+                  <h1 className="text-2xl font-bold text-slate-900">
                     {application.role}
                   </h1>
-                  <div className="flex items-center gap-2 mt-2 text-lg text-gray-600">
+                  <div className="mt-2 flex items-center gap-2 text-lg text-slate-600">
                     <Building2 className="h-5 w-5" />
-                    <span>{application.company}</span>
+                    <span className="truncate">{application.company}</span>
                   </div>
                 </>
               )}
 
-              <div className="flex items-center gap-4 mt-4">
+              <div className="mt-4 flex flex-wrap items-center gap-3">
                 {isEditing ? (
                   <>
                     <select
                       value={editForm.status ?? "APPLIED"}
                       onChange={(e) =>
-                        setEditForm({ ...editForm, status: e.target.value })
+                        setEditForm((f: any) => ({ ...f, status: e.target.value }))
                       }
-                      className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
                     >
                       {STATUSES.map((status) => (
                         <option key={status.id} value={status.id}>
@@ -237,9 +226,9 @@ export default function ApplicationDetail() {
                     <select
                       value={editForm.priority ?? "MEDIUM"}
                       onChange={(e) =>
-                        setEditForm({ ...editForm, priority: e.target.value })
+                        setEditForm((f: any) => ({ ...f, priority: e.target.value }))
                       }
-                      className="px-3 py-1 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/25"
                     >
                       <option value="LOW">Low</option>
                       <option value="MEDIUM">Medium</option>
@@ -256,20 +245,21 @@ export default function ApplicationDetail() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* Actions */}
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
               {isEditing ? (
                 <>
                   <button
                     onClick={handleSave}
                     disabled={updateMutation.isPending}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 cursor-pointer"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60 sm:w-auto"
                   >
                     <Save className="h-4 w-4" />
-                    Save
+                    {updateMutation.isPending ? "Saving…" : "Save"}
                   </button>
                   <button
                     onClick={() => setIsEditing(false)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 flex items-center gap-2 cursor-pointer"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 sm:w-auto"
                   >
                     <X className="h-4 w-4" />
                     Cancel
@@ -279,7 +269,7 @@ export default function ApplicationDetail() {
                 <>
                   <button
                     onClick={handleEdit}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2 cursor-pointer"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 sm:w-auto"
                   >
                     <Edit className="h-4 w-4" />
                     Edit
@@ -287,7 +277,7 @@ export default function ApplicationDetail() {
                   <button
                     onClick={handleDelete}
                     disabled={deleteMutation.isPending}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 cursor-pointer"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-rose-700 disabled:opacity-60 sm:w-auto"
                   >
                     <Trash2 className="h-4 w-4" />
                     Delete
@@ -299,27 +289,38 @@ export default function ApplicationDetail() {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 cursor-pointer ${
-                    activeTab === tab.id
-                      ? "border-indigo-500 text-indigo-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              ))}
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200">
+            <nav
+              className={cx(
+                "flex gap-1 overflow-x-auto px-2 py-2",
+                "[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+              )}
+            >
+              {tabs.map((tab) => {
+                const active = activeTab === tab.id;
+                const Icon = tab.icon;
+
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cx(
+                      "inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition",
+                      active
+                        ? "bg-indigo-50 text-indigo-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
             </nav>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {activeTab === "details" && (
               <DetailsTab
                 application={application}
@@ -328,19 +329,13 @@ export default function ApplicationDetail() {
                 setEditForm={setEditForm}
               />
             )}
-            {activeTab === "notes" && <NotesTab applicationId={id!} notes={notes} />}
-            {activeTab === "contacts" && (
-              <ContactsTab applicationId={id!} contacts={contacts} />
-            )}
-            {activeTab === "reminders" && (
-              <RemindersTab applicationId={id!} reminders={reminders} />
-            )}
-            {activeTab === "attachments" && (
-              <AttachmentsTab applicationId={id!} attachments={attachments} />
-            )}
-            {activeTab === "activity" && (
-              <ActivityTab activities={Array.isArray(activities) ? activities : []} />
-            )}
+
+            {/* ✅ Let tabs own their own data fetching (matches your ContactsTab) */}
+            {activeTab === "notes" && <NotesTab applicationId={id!} notes={[]} />}
+            {activeTab === "contacts" && <ContactsTab applicationId={id!} />}
+            {activeTab === "reminders" && <RemindersTab applicationId={id!} reminders={[]} />}
+            {activeTab === "attachments" && <AttachmentsTab applicationId={id!} />}
+            {activeTab === "history" && <ActivityTab activities={[]} />}
           </div>
         </div>
       </div>

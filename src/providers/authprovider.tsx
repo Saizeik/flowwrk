@@ -1,6 +1,9 @@
+// /providers/authprovider.tsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+
+type OAuthProvider = "google" | "github" | "linkedin_oidc";
 
 type AuthContextValue = {
   user: User | null;
@@ -9,11 +12,19 @@ type AuthContextValue = {
 
   signInWithPassword: (email: string, password: string) => Promise<void>;
   signUpWithPassword: (email: string, password: string) => Promise<void>;
-  signInWithProvider: (provider: "google" | "github") => Promise<void>;
+  signInWithProvider: (provider: OAuthProvider) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function getSiteUrl() {
+  // For Vite + Vercel, you can optionally set VITE_PUBLIC_SITE_URL
+  // Example: http://localhost:3000  (local)
+  //          https://yourdomain.com (prod)
+  const envUrl = import.meta.env.VITE_PUBLIC_SITE_URL as string | undefined;
+  return envUrl || window.location.origin;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -23,7 +34,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // initial session
     supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
       setSession(data.session ?? null);
@@ -31,7 +41,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    // session updates
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession ?? null);
       setUser(nextSession?.user ?? null);
@@ -58,18 +67,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async signUpWithPassword(email, password) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        // note: depending on your Supabase auth settings, user may need email confirmation
       },
 
       async signInWithProvider(provider) {
-        const redirectTo =
-          import.meta.env.DEV
-            ? "http://localhost:3000/dashboard"
-            : `${window.location.origin}/dashboard`;
+        const siteUrl = getSiteUrl();
+        const redirectTo = `${siteUrl}/auth/callback`;
 
         const { error } = await supabase.auth.signInWithOAuth({
           provider,
-          options: { redirectTo },
+          options: {
+            redirectTo,
+            // optional: ask user to pick account each time
+            // queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
+          },
         });
 
         if (error) throw error;

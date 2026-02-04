@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, Plus, Upload, Search, LogOut } from "lucide-react";
 import { useAuth } from "../../providers/authprovider";
-import NotificationsPopover from "../layout/NotificationsPopover";
+import NotificationsPopover from "./NotificationsPopover";
 import { useQuery } from "@tanstack/react-query";
 import { remindersApi } from "../../api";
 

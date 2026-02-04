@@ -7,6 +7,7 @@ import AppLayout from "../components/layout/AuthLayout";
 import Home from "../pages/Home";
 import Login from "../pages/Login";
 import Signup from "../pages/Signup";
+import AuthCallback from "../pages/AuthCallback"; // 👈 ADD THIS
 
 import Dashboard from "../pages/Dashboard";
 import Applications from "../pages/Applications";
@@ -25,6 +26,10 @@ export default function AppRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+
+       
+  {/* ✅ OAuth landing route (must be public) */}
+  <Route path="/auth/callback" element={<AuthCallback />} />
       </Route>
 
       {/* PROTECTED */}
