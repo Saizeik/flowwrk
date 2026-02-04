@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Github, Chrome, ArrowRight, Mail, Lock } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import BrandLogo from "../components/BrandLogo";
+import { useAuth } from "../providers/authprovider";
 
 function cx(...parts: Array<string | false | undefined | null>) {
   return parts.filter(Boolean).join(" ");
@@ -14,6 +15,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { signInWithProvider } = useAuth();
 
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,13 +33,13 @@ export default function Login() {
     setError(null);
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/dashboard` },
-    });
+    try {
+      await signInWithProvider(provider);
+    } catch (e: any) {
+      setError(e?.message ?? "OAuth sign-in failed");
+      setLoading(false);
+    }
 
-    setLoading(false);
-    if (error) setError(error.message);
   };
 
   return (
