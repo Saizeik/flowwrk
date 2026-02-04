@@ -2,7 +2,7 @@ name: Refresh Open Jobs Feed
 
 on:
   schedule:
-    - cron: "0 */6 * * *" # every 6 hours (UTC)
+    - cron: "0 */24 * * *" # every 24 hours (UTC)
   workflow_dispatch: {}
 
 jobs:
