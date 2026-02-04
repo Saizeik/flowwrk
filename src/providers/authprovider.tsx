@@ -83,7 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (error) throw error;
+        console.log("OAuth redirectTo =", redirectTo);
       },
+      
 
       async signOut() {
         const { error } = await supabase.auth.signOut();

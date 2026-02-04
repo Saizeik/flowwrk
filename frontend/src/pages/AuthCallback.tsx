@@ -34,4 +34,5 @@ export default function AuthCallback() {
       Signing you in…
     </div>
   );
+  
 }
