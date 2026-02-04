@@ -18,5 +18,3 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-console.log("VITE_PUBLIC_SITE_URL =", import.meta.env.VITE_PUBLIC_SITE_URL);
-console.log("VITE_SUPABASE_URL =", import.meta.env.VITE_SUPABASE_URL);
