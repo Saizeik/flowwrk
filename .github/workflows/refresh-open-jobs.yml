@@ -28,8 +28,8 @@ jobs:
 
           echo "Calling Edge Function..."
           BODY='{
-            "job_titles": ["Software Engineer", "Frontend Engineer", "Customer Support", "Data Analyst"],
-            "location": "Kirkland,WA","Seattle,WA", "Bellvue,WA","Redmond,WA","United States",
+            "job_titles": ["Software Engineer", "Frontend Engineer", "Customer Support", "Data Analyst", "Client Administrator"],
+            "location": "Kirkland,WA","Seattle,WA", "Bellvue,WA","Redmond,WA","Everett,WA",
             "max_results_per_title": 25
           }'
 
