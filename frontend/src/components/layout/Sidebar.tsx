@@ -100,7 +100,7 @@ export default function Sidebar({
       to: "/open-jobs",
       label: "Open Jobs",
       icon: BriefcaseBusiness,
-      className: "lg:hidden",
+      className: "",
     },
 
     { to: "/analytics", label: "Analytics", icon: BarChart3 },

@@ -6,7 +6,7 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
-import apiClient from "../api";
+import { supabase } from "../lib/supabase";
 
 interface ImportJobModalProps {
   isOpen: boolean;
@@ -45,35 +45,29 @@ export default function ImportJobModal({
     setError(null);
 
     try {
-      const res = await apiClient.post<ImportedData>("/apps/import", {
-        externalSource: url,
-      });
-      const data = res.data;
+      // Edge Function name: "import_job"
+      const { data, error: fnError } = await supabase.functions.invoke<ImportedData>(
+        "import_job",
+        {
+          body: { externalSource: url.trim() },
+        }
+      );
 
-      // If confidence is too low, show error and allow manual entry
+      if (fnError) throw fnError;
+      if (!data) throw new Error("No data returned from import_job");
+
       if (data.confidence < 30) {
-        setError(
-          "Couldn't auto-import this job posting. Please enter details manually."
-        );
+        setError("Couldn't auto-import this job posting. Please enter details manually.");
         setIsLoading(false);
         return;
       }
 
-      // Success - pass data back to parent
       onImportSuccess(data);
       onClose();
       setUrl("");
     } catch (err: any) {
       console.error("Import error:", err);
-      if (err.response?.data?.message) {
-        setError(err.response.data.message);
-      } else if (err.message) {
-        setError(err.message);
-      } else {
-        setError(
-          "Failed to import job posting. Please try again or enter details manually."
-        );
-      }
+      setError(err?.message ?? "Failed to import job posting. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -86,7 +80,7 @@ export default function ImportJobModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -119,8 +113,7 @@ export default function ImportJobModal({
               autoFocus
             />
             <p className="mt-2 text-sm text-gray-500">
-              Paste a link to a job posting from Greenhouse, Lever, Ashby, or
-              other job boards
+              Paste a link to a job posting (Greenhouse, Lever, Ashby, etc.)
             </p>
           </div>
 
@@ -137,14 +130,14 @@ export default function ImportJobModal({
           <button
             onClick={handleClose}
             disabled={isLoading}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
           >
             Cancel
           </button>
           <button
             onClick={handleImport}
             disabled={isLoading || !url.trim()}
-            className="cursor-pointer px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isLoading ? (
               <>
