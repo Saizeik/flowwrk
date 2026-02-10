@@ -9,6 +9,10 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
 
+    # If your secrets are stored under Settings -> Environments -> production,
+    # uncomment the next line and ensure the name matches exactly.
+    # environment: production
+
     steps:
       - name: Call Supabase Edge Function
         env:
@@ -18,7 +22,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # ---- Normalize & validate secrets FIRST ----
           FUNCTION_URL="$(echo -n "${FUNCTION_URL:-}" | tr -d '\r\n' | xargs)"
           SERVICE_ROLE="$(echo -n "${SERVICE_ROLE:-}" | tr -d '\r\n' | xargs)"
           ANON_KEY="$(echo -n "${ANON_KEY:-}" | tr -d '\r\n' | xargs)"
@@ -28,39 +31,29 @@ jobs:
           echo "Has SERVICE_ROLE? $([[ -n "$SERVICE_ROLE" ]] && echo yes || echo no)"
           echo "Has ANON_KEY? $([[ -n "$ANON_KEY" ]] && echo yes || echo no)"
 
-          # Safe-ish debug: reveals leading hidden chars like \[ or \" or \  without printing full secret
+          if [[ -z "$FUNCTION_URL" ]]; then
+            echo "❌ SUPABASE_FUNCTION_URL is empty."
+            echo "➡️ Fix: ensure the secret exists in THIS repo under Settings → Secrets and variables → Actions,"
+            echo "   OR if stored in an Environment, add: environment: <name> to the job."
+            exit 1
+          fi
+
           printf 'FUNCTION_URL (bash-quoted): %q\n' "$FUNCTION_URL"
           echo "FUNCTION_URL starts with: ${FUNCTION_URL:0:40}"
 
-          if [[ -z "$FUNCTION_URL" ]]; then
-            echo "❌ SUPABASE_FUNCTION_URL is empty."
-            exit 1
-          fi
-
           if [[ "$FUNCTION_URL" != https://* ]]; then
-            echo "❌ FUNCTION_URL must start with https:// (check for leading bracket/quote/space in the secret)."
+            echo "❌ FUNCTION_URL must start with https://"
             exit 1
           fi
 
-          # Optional guard to reduce common misconfig:
-          # If you want to require the /functions/v1/ shape, uncomment:
-          # if [[ "$FUNCTION_URL" != *"/functions/v1/"* ]]; then
-          #   echo "❌ FUNCTION_URL doesn't look like an Edge Function invoke URL (expected .../functions/v1/<function>)."
-          #   exit 1
-          # fi
-
-          # ---- Request payload ----
           BODY='{
             "job_titles": ["Software Engineer", "Frontend Engineer", "Customer Support", "Data Analyst", "Client Administrator"],
             "locations": ["Kirkland, WA", "Seattle, WA", "Bellevue, WA", "Redmond, WA", "Everett, WA"],
             "max_results_per_title": 25
           }'
 
-          echo "Validating JSON payload..."
           echo "$BODY" | python -m json.tool >/dev/null
 
-          echo "Calling Edge Function..."
-          # Capture status code while saving response body
           HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" -X POST "$FUNCTION_URL" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $SERVICE_ROLE" \
@@ -68,15 +61,11 @@ jobs:
             --data "$BODY")
 
           echo "HTTP $HTTP_CODE"
-          echo "---- response.json ----"
           cat response.json || true
-          echo ""
-          echo "-----------------------"
 
-          # Fail job on non-2xx
           if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
             echo "❌ Edge Function call failed (HTTP $HTTP_CODE)."
             exit 1
           fi
 
-          echo "✅ Edge Function call succeeded and response saved to response.json"
+          echo "✅ Success"
