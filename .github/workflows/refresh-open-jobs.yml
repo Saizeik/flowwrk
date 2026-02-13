@@ -21,6 +21,15 @@ jobs:
           echo "sha:   $GITHUB_SHA"
           echo "event: $GITHUB_EVENT_NAME"
           echo "actor: $GITHUB_ACTOR"
+      - name: Test secret visibility (safe)
+        env:
+          HAS_TEST_ONE: ${{ secrets.TEST_SECRET_ONE && 'true' || 'false' }}
+          HAS_TEST_TWO: ${{ secrets.TEST_SECRET_TWO && 'true' || 'false' }}
+          HAS_TEST_THREE: ${{ secrets.TEST_SECRET_THREE && 'true' || 'false' }}
+        run: |
+          echo "HAS_TEST_ONE=$HAS_TEST_ONE"
+          echo "HAS_TEST_TWO=$HAS_TEST_TWO"
+          echo "HAS_TEST_THREE=$HAS_TEST_THREE"
 
       - name: Secrets visibility (safe booleans)
         env:
