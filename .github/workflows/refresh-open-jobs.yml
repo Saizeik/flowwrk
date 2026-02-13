@@ -9,9 +9,10 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
 
-    # If your secrets are stored under Settings -> Environments -> production,
-    # uncomment the next line and ensure the name matches exactly.
-    # environment: production
+    # IMPORTANT:
+    # This must match your Environment name exactly (case-sensitive).
+    # Put your Supabase secrets under Settings -> Environments -> production -> Secrets
+    environment: production
 
     steps:
       - name: Diagnostics (safe)
@@ -21,15 +22,6 @@ jobs:
           echo "sha:   $GITHUB_SHA"
           echo "event: $GITHUB_EVENT_NAME"
           echo "actor: $GITHUB_ACTOR"
-      - name: Test secret visibility (safe)
-        env:
-          HAS_TEST_ONE: ${{ secrets.TEST_SECRET_ONE && 'true' || 'false' }}
-          HAS_TEST_TWO: ${{ secrets.TEST_SECRET_TWO && 'true' || 'false' }}
-          HAS_TEST_THREE: ${{ secrets.TEST_SECRET_THREE && 'true' || 'false' }}
-        run: |
-          echo "HAS_TEST_ONE=$HAS_TEST_ONE"
-          echo "HAS_TEST_TWO=$HAS_TEST_TWO"
-          echo "HAS_TEST_THREE=$HAS_TEST_THREE"
 
       - name: Secrets visibility (safe booleans)
         env:
@@ -49,7 +41,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # ---- Normalize & validate secrets FIRST ----
+          # Normalize/trim (handles copy/paste whitespace/newlines)
           FUNCTION_URL="$(echo -n "${FUNCTION_URL:-}" | tr -d '\r\n' | xargs)"
           SERVICE_ROLE="$(echo -n "${SERVICE_ROLE:-}" | tr -d '\r\n' | xargs)"
           ANON_KEY="$(echo -n "${ANON_KEY:-}" | tr -d '\r\n' | xargs)"
@@ -61,20 +53,19 @@ jobs:
 
           if [[ -z "$FUNCTION_URL" ]]; then
             echo "❌ SUPABASE_FUNCTION_URL is empty."
-            echo "➡️ Fix: ensure the secret exists in THIS repo under Settings → Secrets and variables → Actions,"
-            echo "   OR if stored in an Environment, add: environment: <name> to the job."
+            echo "➡️ Put SUPABASE_FUNCTION_URL into Settings → Environments → production → Secrets"
             exit 1
           fi
 
           printf 'FUNCTION_URL (bash-quoted): %q\n' "$FUNCTION_URL"
-          echo "FUNCTION_URL starts with: ${FUNCTION_URL:0:60}"
+          echo "FUNCTION_URL starts with: ${FUNCTION_URL:0:80}"
 
           if [[ "$FUNCTION_URL" != https://* ]]; then
             echo "❌ FUNCTION_URL must start with https://"
             exit 1
           fi
 
-          # ---- Request payload ----
+          # Payload (valid JSON)
           BODY='{
             "job_titles": ["Software Engineer", "Frontend Engineer", "Customer Support", "Data Analyst", "Client Administrator"],
             "locations": ["Kirkland, WA", "Seattle, WA", "Bellevue, WA", "Redmond, WA", "Everett, WA"],
